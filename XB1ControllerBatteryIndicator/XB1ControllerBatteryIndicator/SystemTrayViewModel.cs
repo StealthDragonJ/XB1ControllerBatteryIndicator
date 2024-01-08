@@ -92,7 +92,7 @@ namespace XB1ControllerBatteryIndicator
                             {
                                 var batteryInfo = currentController.GetBatteryInformation(BatteryDeviceType.Gamepad);
                                 //check if toast was already triggered and battery is no longer empty...
-                                if (batteryInfo.BatteryLevel != BatteryLevel.Empty)
+                                if (batteryInfo.BatteryLevel != BatteryLevel.Empty && batteryInfo.BatteryLevel != BatteryLevel.Low)
                                 {
                                     if (toast_shown[numdict[$"{currentController.UserIndex}"]] == true)
                                     {
@@ -126,7 +126,7 @@ namespace XB1ControllerBatteryIndicator
                                     TooltipText = string.Format(Strings.ToolTip_Wireless, controllerIndexCaption, batteryLevelCaption);
                                     ActiveIcon = $"Resources/battery_{batteryInfo.BatteryLevel.ToString().ToLower()}_{currentController.UserIndex.ToString().ToLower() + LightTheme()}.ico";
                                     //when "empty" state is detected...
-                                    if (batteryInfo.BatteryLevel == BatteryLevel.Empty)
+                                    if (batteryInfo.BatteryLevel == BatteryLevel.Empty || batteryInfo.BatteryLevel == BatteryLevel.Low)
                                     {
                                         //check if toast (notification) for current controller was already triggered
                                         if (toast_shown[numdict[$"{currentController.UserIndex}"]] == false)

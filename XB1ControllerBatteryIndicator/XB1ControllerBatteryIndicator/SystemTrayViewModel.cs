@@ -18,6 +18,7 @@ using XB1ControllerBatteryIndicator.Localization;
 using XB1ControllerBatteryIndicator.Properties;
 using System.Security.Principal;
 using Microsoft.Win32;
+using System.Linq.Expressions;
 
 namespace XB1ControllerBatteryIndicator
 {
@@ -34,22 +35,16 @@ namespace XB1ControllerBatteryIndicator
 
         private SoundPlayer _soundPlayer;
 
-        private Dictionary<BatteryLevel, LowBatteryLevelData> lowBatteryLevelsData = new Dictionary<BatteryLevel, LowBatteryLevelData>()
+        private static Dictionary<BatteryLevel, LowBatteryLevelData> LowBatteryLevelsData = new Dictionary<BatteryLevel, LowBatteryLevelData>()
         {
             { BatteryLevel.Empty, new LowBatteryLevelData("ControllerToast", Strings.Toast_Title, Strings.Toast_Text) },
             { BatteryLevel.Low, new LowBatteryLevelData("ControllerToast", Strings.Toast_LowBattery_Title, Strings.Toast_LowBattery_Text) }
         };
 
-        // TODO** change to array instead since index is simply an int anyway
         // keeps track of the battery level for the currently shown notification
-        private Dictionary<int, BatteryNotificationData> toast_shown = new Dictionary<int, BatteryNotificationData>()
-        {
-            { 0, new BatteryNotificationData() },
-            { 1, new BatteryNotificationData() },
-            { 2, new BatteryNotificationData() },
-            { 3, new BatteryNotificationData() },
-            { 4, new BatteryNotificationData() }
-        };
+        private BatteryNotificationData[] toast_shown = new BatteryNotificationData[5];
+
+        private bool testMode = false;
 
         private class LowBatteryLevelData
         {
@@ -89,12 +84,25 @@ namespace XB1ControllerBatteryIndicator
                 return (this.batteryLevel == batteryLevel) && this.enabled;
             }
 
-            public void Enable(BatteryLevel batteryLevel)
+            public void ClearNotification(Controller controller)
             {
+                if (enabled)
+                {
+                    ToastNotificationManager.History.Remove($"Controller{controller.UserIndex}", LowBatteryLevelsData[batteryLevel].group, APP_ID);
+
+                    enabled = false;
+                }
+            }
+
+            public void SetAsEnabled(Controller controller, BatteryLevel batteryLevel)
+            {
+                ClearNotification(controller);
+
                 this.batteryLevel = batteryLevel;
 
                 enabled = true;
             }
+
         }
 
         public SystemTrayViewModel()
@@ -114,22 +122,73 @@ namespace XB1ControllerBatteryIndicator
             th.Start();
         }
 
-        BatteryLevel testBatteryLevel = BatteryLevel.Full + 1;
-
-        private BatteryLevel ControllerTester(BatteryLevel currentLevel)
+        class ControllerTester
         {
-            int seconds = 5;
-            int delay = seconds * 1000;
+            private BatteryLevel testBatteryLevel;
 
-            if (currentLevel > 0)
+            private float delayInSeconds;
+
+            private bool movingDownward;
+
+            // used to only give the intital battery level once
+            private bool giveInitialBatteryLevel;
+
+            public ControllerTester() : this(BatteryLevel.Full, 5)
             {
-                currentLevel -= 1;
 
-                Thread.Sleep(delay);
             }
 
-            return currentLevel;
+            public ControllerTester(BatteryLevel initalBatteryLevel, float delayInSeconds)
+            {
+                testBatteryLevel = initalBatteryLevel;
+
+                this.delayInSeconds = delayInSeconds;
+
+                giveInitialBatteryLevel = true;
+            }
+
+            public BatteryLevel Test()
+            {
+                float delay = delayInSeconds * 1000;
+
+                bool full = (testBatteryLevel == BatteryLevel.Full);
+                bool empty = (testBatteryLevel == BatteryLevel.Empty);
+
+                // change downwards or upwards direction
+                if (full)
+                {
+                    movingDownward = true;
+                }
+                else if (empty)
+                {
+                    movingDownward = false;
+                }
+
+                if (!giveInitialBatteryLevel)
+                {
+                    // set the new level
+                    if (movingDownward)
+                    {
+                        testBatteryLevel -= 1;
+                    }
+                    else
+                    {
+                        testBatteryLevel += 1;
+                    }
+                }
+                else
+                {
+                    // set to false for the next time this method is run
+                    giveInitialBatteryLevel = false;
+                }
+
+                Thread.Sleep((int) delay);
+
+                return testBatteryLevel;
+            }
         }
+
+        
 
         public string ActiveIcon
         {
@@ -148,6 +207,13 @@ namespace XB1ControllerBatteryIndicator
         private void RefreshControllerState()
         {
             bool lowBatteryWarningSoundPlayed = false;
+
+            ControllerTester tester = new ControllerTester();
+
+            for(int i = 0; i < toast_shown.Length; i++)
+            {
+                toast_shown[i] = new BatteryNotificationData();
+            }
 
             while(true)
             {
@@ -175,23 +241,23 @@ namespace XB1ControllerBatteryIndicator
                                 // test code
                                 //batteryInfo.BatteryLevel = BatteryLevel.Low;
 
-                                testBatteryLevel = ControllerTester(testBatteryLevel);
-                                batteryInfo.BatteryLevel = testBatteryLevel;
+                                if (testMode)
+                                {
+                                    batteryInfo.BatteryLevel = tester.Test();
+                                }
 
                                 //check if toast was already triggered and battery is no longer empty...
                                 //if (batteryInfo.BatteryLevel != BatteryLevel.Empty && batteryInfo.BatteryLevel != BatteryLevel.Low)
-                                if (!lowBatteryLevelsData.ContainsKey(batteryInfo.BatteryLevel))
+                                if (!LowBatteryLevelsData.ContainsKey(batteryInfo.BatteryLevel))
                                 {
                                     //if (toast_shown[numdict[$"{currentController.UserIndex}"]] == true)
                                     if (toast_shown[numdict[$"{currentController.UserIndex}"]].enabled == true)
                                     {
                                         //...reset the notification
                                         //toast_shown[numdict[$"{currentController.UserIndex}"]] = false;
-                                        toast_shown[numdict[$"{currentController.UserIndex}"]].enabled = false;
 
                                         //ToastNotificationManager.History.Remove($"Controller{currentController.UserIndex}", "ControllerToast", APP_ID);
-                                        ToastNotificationManager.History.Remove($"Controller{currentController.UserIndex}", lowBatteryLevelsData[BatteryLevel.Empty].group, APP_ID);
-                                        ToastNotificationManager.History.Remove($"Controller{currentController.UserIndex}", lowBatteryLevelsData[BatteryLevel.Low].group, APP_ID);
+                                        toast_shown[numdict[$"{currentController.UserIndex}"]].ClearNotification(currentController);
                                     }
                                 }
                                 //wired
@@ -220,7 +286,7 @@ namespace XB1ControllerBatteryIndicator
                                     ActiveIcon = $"Resources/battery_{batteryInfo.BatteryLevel.ToString().ToLower()}_{currentController.UserIndex.ToString().ToLower() + LightTheme()}.ico";
                                     //when "empty" state is detected...
                                     //if (batteryInfo.BatteryLevel == BatteryLevel.Empty || batteryInfo.BatteryLevel == BatteryLevel.Low)
-                                    if (lowBatteryLevelsData.ContainsKey(batteryInfo.BatteryLevel))
+                                    if (LowBatteryLevelsData.ContainsKey(batteryInfo.BatteryLevel))
                                     {
                                         //check if toast (notification) for current controller was already triggered
                                         //if (toast_shown[numdict[$"{currentController.UserIndex}"]] == false)
@@ -229,9 +295,9 @@ namespace XB1ControllerBatteryIndicator
                                         {
                                             //if not, trigger it
                                             //toast_shown[numdict[$"{currentController.UserIndex}"]].enabled = true;
-                                            toast_shown[numdict[$"{currentController.UserIndex}"]].Enable(batteryInfo.BatteryLevel);
+                                            toast_shown[numdict[$"{currentController.UserIndex}"]].SetAsEnabled(currentController, batteryInfo.BatteryLevel);
 
-                                            ShowToast(currentController.UserIndex, lowBatteryLevelsData[batteryInfo.BatteryLevel]);
+                                            ShowToast(currentController.UserIndex, LowBatteryLevelsData[batteryInfo.BatteryLevel]);
                                         }
                                         //check if notification sound is enabled
                                         if (Settings.Default.LowBatteryWarningSound_Enabled)

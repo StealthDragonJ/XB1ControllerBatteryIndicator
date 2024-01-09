@@ -91,6 +91,10 @@ namespace XB1ControllerBatteryIndicator
                             if (currentController.IsConnected)
                             {
                                 var batteryInfo = currentController.GetBatteryInformation(BatteryDeviceType.Gamepad);
+
+                                // test code
+                                //batteryInfo.BatteryLevel = BatteryLevel.Low;
+
                                 //check if toast was already triggered and battery is no longer empty...
                                 if (batteryInfo.BatteryLevel != BatteryLevel.Empty && batteryInfo.BatteryLevel != BatteryLevel.Low)
                                 {

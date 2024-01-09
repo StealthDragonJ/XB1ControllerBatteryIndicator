@@ -223,6 +223,24 @@ namespace XB1ControllerBatteryIndicator.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Controller {0} may only have a few hours of battery left..
+        /// </summary>
+        public static string Toast_LowBattery_Text {
+            get {
+                return ResourceManager.GetString("Toast_LowBattery_Text", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Controller {0} battery becoming low warning.
+        /// </summary>
+        public static string Toast_LowBattery_Title {
+            get {
+                return ResourceManager.GetString("Toast_LowBattery_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Battery of controller {0} is (almost) empty..
         /// </summary>
         public static string Toast_Text {
